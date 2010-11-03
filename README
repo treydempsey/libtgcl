@@ -1,0 +1,15 @@
+libtgcl
+-------
+libtgcl, Trey's Generic c Class Library, is a collection of useful classes
+for C.
+
+
+Installation
+------------
+See the INSTALL file for details and instructions.
+
+
+License
+-------
+libtgcl is distributed under the terms of the GNU Lesser General Public
+License.  See COPYING.LESSER for more details.
