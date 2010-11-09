@@ -109,11 +109,12 @@ alloc_String(size_t size)
   (*handle)->m = &String_methods;
 
   (*handle)->string = malloc(sizeof(char) * size);
-  if(*handle == NULL) {
+  if((*handle)->string == NULL) {
     free(*handle);
     free(handle);
     goto error;
   }
+  memset((*handle)->string, 0, sizeof(char) * size);
 
 error:
 
@@ -139,7 +140,7 @@ String_init(String * self, char * cstr, size_t size, size_t length)
   if(length > size) {
     self->m->extend(self, (length - size) + 1);
   }
-  strncpy(self->string, cstr, self->length);
+  memcpy(self->string, cstr, self->length);
   *(self->string + self->length) = '\0';
 
   return self;
@@ -209,7 +210,7 @@ String_append(String * self, String * other)
       self->m->extend(self, (new_size - self->size) + 1);
     }
 
-    strncpy(self->string + self->length, other->string + other_position, append_length);
+    memcpy(self->string + self->length, other->string + other_position, append_length);
     self->length = self->length + append_length;
     *(self->string + self->length) = '\0';
   }
@@ -235,7 +236,7 @@ String_append_cstr(String * self, char * cstr, size_t append_length)
       cpy_size = self->size - self->length;
     }
 
-    strncpy(self->string + self->length, cstr, cpy_size);
+    memcpy(self->string + self->length, cstr, cpy_size);
     self->length = self->length + append_length;
   }
 
@@ -272,7 +273,7 @@ String_append_slice(String * self, String * other, size_t slice_length)
       self->m->extend(self, (new_size - self->size) + 1);
     }
 
-    strncpy(self->string + self->length, other->string + other_position, append_length);
+    memcpy(self->string + self->length, other->string + other_position, append_length);
     self->length = self->length + append_length;
     *(self->string + self->length) = '\0';
   }
@@ -309,7 +310,7 @@ String_compare(String * self, String * other)
 
   if(self != null_String) {
     compare_length = ((self->length - self->position) < (other->length - self->position)) ? self->length - self->position : other->length - other->position;
-    r = strncmp(self->string + self->position, other->string + other->position, compare_length);
+    r = memcmp(self->string + self->position, other->string + other->position, compare_length);
 
     if(r == 0) {
       if((self->length - self->position) > (other->length - other->position)) {
@@ -333,7 +334,7 @@ String_compare_cstr(String * self, char * other, size_t other_length)
 
   if(self != null_String) {
     compare_length = ((self->length - self->position) < other_length) ? self->length - self->position : other_length;
-    r = strncmp(self->string + self->position, other, compare_length);
+    r = memcmp(self->string + self->position, other, compare_length);
 
     if(r == 0) {
       if((self->length - self->position) > other_length) {
@@ -358,7 +359,7 @@ String_comparen(String * self, String * other, size_t compare_length)
   if(self != null_String) {
     safe_compare_length = ((self->length - self->position) < (other->length - other->position)) ? self->length - self->position : other->length - other->position;
     safe_compare_length = (safe_compare_length < compare_length) ? safe_compare_length : compare_length;
-    r = strncmp(self->string + self->position, other->string + other->position, safe_compare_length);
+    r = memcmp(self->string + self->position, other->string + other->position, safe_compare_length);
   }
 
   return r;
