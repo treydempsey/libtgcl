@@ -2,7 +2,7 @@ AUTOMAKE_OPTIONS = gnu
 
 lib_LTLIBRARIES = libtgcl.la
 
-AM_CFLAGS = -g -std=c99 -Wall -arch x86_64
+AM_CFLAGS = -g -std=c99 -Wall -arch x86_64 -fnested-functions
 
 libtgcl_la_LDFLAGS = -version-info 0:0:0
 libtgcl_la_SOURCES = class_ArrayElement_i.c class_Array_i.c class_String_i.c

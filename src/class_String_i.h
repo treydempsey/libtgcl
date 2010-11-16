@@ -42,6 +42,7 @@ static String *       String_free(String * self);
 
 static String *       String_set_blk_size(String * self, size_t new_blk_size);
 
+static void           String_Array_free(void * string);
 static String *       String_append(String * self, String * other);
 static String *       String_append_cstr(String * self, char * cstr, size_t append_length);
 static String *       String_append_slice(String * self, String * other, size_t slice_length);
@@ -56,6 +57,7 @@ static size_t         String_eol(String * self);
 static String *       String_extend(String * self, size_t add);
 static unsigned char  String_hex_to_byte(String * self);
 static int            String_ishex(String * self);
+static String *       String_join(String * self, Array * array, String * separator);
 static String *       String_ltrim(String * self);
 static String *       String_rtrim(String * self);
 static String *       String_slice(String * self, String * other, size_t slice_length);
@@ -63,9 +65,8 @@ static Array *        String_split(String * self, String * delimiter);
 static int            String_to_i(String * self);
 static String *       String_truncate(String * self);
 static String *       String_upcase(String * self);
+static size_t         String_utf8_length(String * self);
 
-/* Private Methods */
-static void           _String_Array_free(void *);
 
 /* Global Variables */
 String *              null_String = NULL;
@@ -73,5 +74,8 @@ String *              null_String = NULL;
 static String         _null_String;
 static char           _null_String_string[] = "\0";
 static StringMethods  String_methods;
+
+
+#define UTF8_ONEMASK ((size_t)(-1) / 0xFF)
 
 #endif /* not _CLASS_STRING_I_H_ */

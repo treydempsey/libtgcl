@@ -27,6 +27,7 @@
 /* Dependencies */
 #include <class_Array.h>
 
+
 /* Class Instance */
 typedef struct String {
   struct String **        handle;
@@ -51,6 +52,7 @@ typedef struct StringMethods {
   String *      (*set_blk_size)(String * self, size_t new_blk_size);
 
   /* Instance Methods */
+  void          (*Array_free)(void * string);
   String *      (*append)(String * self, String * other);
   String *      (*append_cstr)(String * self, char * cstr, size_t append_length);
   String *      (*append_slice)(String * self, String * other, size_t slice_length);
@@ -65,6 +67,7 @@ typedef struct StringMethods {
   String *      (*extend)(String * self, size_t add);
   unsigned char (*hex_to_byte)(String * self);
   int           (*ishex)(String * self);
+  String *      (*join)(String * self, Array * array, String * separator);
   String *      (*ltrim)(String * self);
   String *      (*rtrim)(String * self);
   String *      (*slice)(String * self, String * other, size_t slice_length);
@@ -72,6 +75,7 @@ typedef struct StringMethods {
   int           (*to_i)(String * self);
   String *      (*truncate)(String * self);
   String *      (*upcase)(String * self);
+  size_t        (*utf8_length)(String * self);
 } StringMethods;
 
 

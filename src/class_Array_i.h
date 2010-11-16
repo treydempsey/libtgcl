@@ -46,6 +46,7 @@ static ArrayElement * Array_each(Array * self);
 static ArrayElement * Array_get(Array * self, size_t index);
 static ArrayElement * Array_include(Array * self, ArrayElement * element);
 static Array *        Array_intersection(Array * self, Array * other);
+static void *         Array_join(Array * self, void * target, void * (*block)(Array * array, ArrayElement * element, void * target));
 static ArrayElement * Array_last(Array * self);
 static Array *        Array_reset_each(Array * self);
 static Array *        Array_repetition(Array * self, int times);
@@ -54,7 +55,6 @@ static Array *        Array_set(Array * self, size_t index, ArrayElement * eleme
 /* Private Methods */
 static Array *        _Array_extend_elements(Array * self, int add_chunks);
 static Array *        _Array_null_elements(Array * self, size_t start, size_t end);
-inline static size_t  _Array_size_elements(Array * self);
 
 /* Global Variables */
 Array *               null_Array = NULL;

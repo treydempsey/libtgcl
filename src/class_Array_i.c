@@ -49,6 +49,7 @@ class_Array(void)
     Array_methods.get             = Array_get;
     Array_methods.include         = Array_include;
     Array_methods.intersection    = Array_intersection;
+    Array_methods.join            = Array_join;
     Array_methods.last            = Array_last;
     Array_methods.reset_each      = Array_reset_each;
     Array_methods.repetition      = Array_repetition;
@@ -116,19 +117,21 @@ Array_init(Array * self)
   self->current_element = null_ArrayElement;
   self->current_index = 0;
   self->chunk_size = ARRAY_CHUNK_SIZE;
+  self->size = ARRAY_CHUNK_SIZE;
   self->chunks = 1;
   self->length = 0;
 
   if(self != null_Array) {
-    self->elements = malloc(self->chunk_size * sizeof(ArrayElement *));
+    self->elements = malloc(self->size * sizeof(ArrayElement *));
     if(self->elements == NULL) {
       free(self->handle);
       free(self);
       goto error;
     }
-    _Array_null_elements(self, 0, _Array_size_elements(self) - 1);
+    _Array_null_elements(self, 0, self->size - 1);
   }
   else {
+    self->size = 1;
     self->chunk_size = 1;
     self->elements = null_ArrayElement->handle;
   }
@@ -179,7 +182,7 @@ Array_append(Array * self, void * data)
   ArrayElement * new_element;
 
   if(self != null_Array) {
-    if((self->length + 1) >= _Array_size_elements(self)) {
+    if((self->length + 1) >= self->size) {
       _Array_extend_elements(self, 1);
     }
 
@@ -197,7 +200,7 @@ static Array *
 Array_append_element(Array * self, ArrayElement * element)
 {
   if(self != null_Array) {
-    if((self->length + 1) >= _Array_size_elements(self)) {
+    if((self->length + 1) >= self->size) {
       _Array_extend_elements(self, 1);
     }
 
@@ -306,7 +309,9 @@ Array_each(Array * self)
 static ArrayElement *
 Array_get(Array * self, size_t index)
 {
-  if(self != null_Array) {
+  if(self != null_Array
+     && index >= 0
+     && index < self->length) {
     return self->elements[index];
   }
   else {
@@ -328,6 +333,48 @@ Array_include(Array * self, ArrayElement * element)
   }
 
   return self->current_element;
+}
+
+
+static Array *
+Array_intersection(Array * self, Array * other)
+{
+  Array * new_array;
+
+  if(self != null_Array) {
+    new_array = new_Array();
+
+    self->m->reset_each(self);
+    while(self->m->each(self) != null_ArrayElement) {
+      if(other->m->include(other, self->current_element) != null_ArrayElement) {
+        new_array->m->append(new_array, self->current_element->m->dup(self->current_element));
+      }
+    }
+
+    return new_array;
+  }
+  else {
+    return null_Array;
+  }
+}
+
+
+static void *
+Array_join(Array * self, void * target, void * (*block)(Array * array, ArrayElement * element, void * target))
+{
+  void * r = NULL;
+
+  if(self != null_Array) {
+    self->m->reset_each(self);
+    while(self->m->each(self) != null_ArrayElement) {
+      r = block(self, self->current_element, target);
+    }
+    
+    return r;
+  }
+  else {
+    return self;
+  }
 }
 
 
@@ -353,29 +400,6 @@ Array_reset_each(Array * self)
   }
 
   return self;
-}
-
-
-static Array *
-Array_intersection(Array * self, Array * other)
-{
-  Array * new_array;
-
-  if(self != null_Array) {
-    new_array = new_Array();
-
-    self->m->reset_each(self);
-    while(self->m->each(self) != null_ArrayElement) {
-      if(other->m->include(other, self->current_element) != null_ArrayElement) {
-        new_array->m->append(new_array, self->current_element->m->dup(self->current_element));
-      }
-    }
-
-    return new_array;
-  }
-  else {
-    return null_Array;
-  }
 }
 
 
@@ -413,7 +437,7 @@ Array_set(Array * self, size_t index, ArrayElement * element)
   int chunks;
 
   if(self != null_Array) {
-    if(index >= _Array_size_elements(self)) {
+    if(index >= self->size) {
       chunks = ((index + 1) / self->chunk_size);
       if(((index + 1) % self->chunk_size) > 0) {
         chunks++;
@@ -437,28 +461,30 @@ Array_set(Array * self, size_t index, ArrayElement * element)
  * Private Methods
  *****************/
 
-static inline size_t
-_Array_size_elements(Array * self)
-{
-  return self->chunks * self->chunk_size;
-}
-
-
 static Array *
-_Array_extend_elements(Array * self, int add)
+_Array_extend_elements(Array * self, int add_elements)
 {
+  size_t          new_size;
+  size_t          new_chunks;
   ArrayElement ** extended;
 
   if(self != null_Array) {
-    extended = realloc(self->elements, (self->chunks + add) * sizeof(ArrayElement *));
-    if(extended == NULL) {
-      goto error;
+    new_size = self->size + add_elements;
+    new_chunks = new_size / self->chunk_size;
+    new_chunks += (new_size % self->chunk_size == 0) ? 0 : 1;
+
+    if(new_chunks > self->chunks) {
+      extended = realloc(self->elements, (new_chunks * self->chunk_size) * sizeof(ArrayElement *));
+      if(extended == NULL) {
+        goto error;
+      }
+      else {
+        self->chunks = new_chunks;
+        self->size = new_chunks * self->chunk_size;
+        self->elements = extended;
+      }
+      _Array_null_elements(self, self->length, self->size - 1);
     }
-    else {
-      self->chunks += add;
-      self->elements = extended;
-    }
-    _Array_null_elements(self, self->length, _Array_size_elements(self) - 1);
 
   error:
 
@@ -477,7 +503,7 @@ _Array_null_elements(Array * self, size_t start, size_t end)
   int i, j;
 
   if(self != null_Array) {
-    j = _Array_size_elements(self);
+    j = self->size;
     j = (end < j) ? end : j - 1;
 
     for(i = start; i <= j; i++) {

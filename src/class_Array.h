@@ -28,12 +28,14 @@
 
 #define ARRAY_CHUNK_SIZE 10
 
+
 /* Class Instance */
 typedef struct Array {
   struct Array **         handle;
 
   struct ArrayElement **  elements;
   struct ArrayElement *   current_element;
+  size_t                  size;
   int                     length;
   int                     current_index;
   size_t                  chunk_size;
@@ -61,6 +63,7 @@ typedef struct ArrayMethods {
   ArrayElement *          (*get)(Array * self, size_t index);
   ArrayElement *          (*include)(Array * self, ArrayElement * element);
   Array *                 (*intersection)(Array * self, Array * other);
+  void *                  (*join)(Array * self, void * target, void * (*block)(Array * array, ArrayElement * element, void * target));
   ArrayElement *          (*last)(Array * self);
   Array *                 (*reset_each)(Array * self);
   Array *                 (*repetition)(Array * self, int times);

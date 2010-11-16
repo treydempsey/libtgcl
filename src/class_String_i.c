@@ -41,6 +41,7 @@ class_String(void)
 
     String_methods.set_blk_size = String_set_blk_size;
 
+    String_methods.Array_free   = String_Array_free;
     String_methods.append       = String_append;
     String_methods.append_cstr  = String_append_cstr;
     String_methods.append_slice = String_append_slice;
@@ -55,6 +56,7 @@ class_String(void)
     String_methods.extend       = String_extend;
     String_methods.hex_to_byte  = String_hex_to_byte;
     String_methods.ishex        = String_ishex;
+    String_methods.join         = String_join;
     String_methods.ltrim        = String_ltrim;
     String_methods.rtrim        = String_rtrim;
     String_methods.slice        = String_slice;
@@ -62,6 +64,7 @@ class_String(void)
     String_methods.to_i         = String_to_i;
     String_methods.truncate     = String_truncate;
     String_methods.upcase       = String_upcase;
+    String_methods.utf8_length  = String_utf8_length;
 
     /* Null String Instance */
     null_String                 = &_null_String;
@@ -181,6 +184,16 @@ String_set_blk_size(String * self, size_t new_blk_size)
  * Public Instance Methods
  *************************/
 
+static void
+String_Array_free(void * string)
+{
+  String *  s;
+
+  s = (String *)string;
+  s->m->free(s);
+}
+
+
 static String *
 String_append(String * self, String * other)
 {
@@ -192,21 +205,16 @@ String_append(String * self, String * other)
   if(self != null_String) {
     other_length = other->length;
     other_position = other->position;
-
     if(other_length > other->size) {
       other_length = other->size;
     }
     if(other_position > other_length) {
       other_position = other_length;
     }
-
     append_length = other_length - other_position;
-    if((other_position + append_length) > other_length) {
-      append_length = other_length - other_position;
-    }
 
     new_size = self->length + append_length;
-    if(new_size > self->size) {
+    if(new_size >= self->size) {
       self->m->extend(self, (new_size - self->size) + 1);
     }
 
@@ -227,7 +235,7 @@ String_append_cstr(String * self, char * cstr, size_t append_length)
 
   if(self != null_String) {
     new_size = self->length + append_length;
-    if(new_size > self->size) {
+    if(new_size >= self->size) {
       self->m->extend(self, (new_size - self->size) + 1);
     }
 
@@ -238,6 +246,7 @@ String_append_cstr(String * self, char * cstr, size_t append_length)
 
     memcpy(self->string + self->length, cstr, cpy_size);
     self->length = self->length + append_length;
+    *(self->string + self->length) = '\0';
   }
 
   return self;
@@ -255,14 +264,12 @@ String_append_slice(String * self, String * other, size_t slice_length)
   if(self != null_String) {
     other_length = other->length;
     other_position = other->position;
-
     if(other_length > other->size) {
       other_length = other->size;
     }
     if(other_position > other_length) {
       other_position = other_length;
     }
-
     append_length = slice_length;
     if((other_position + append_length) > other_length) {
       append_length = other_length - other_position;
@@ -549,6 +556,27 @@ String_ishex(String * self)
 
 
 static String *
+String_join(String * self, Array * array, String * separator)
+{
+  void *
+  join_block(Array * array, ArrayElement * element, void * target)
+  {
+    ((String *)target)->m->append((String *)target, (String *)element->data);
+    if(separator != null_String && array->current_index < (array->length - 1)) {
+      self->m->append(self, separator);
+    }
+    return target;
+  }
+
+  if(self != null_String && array != null_Array) {
+    array->m->join(array, self, join_block);
+  }
+
+  return self;
+}
+
+
+static String *
 String_ltrim(String * self)
 {
   size_t offset = 0;
@@ -643,7 +671,7 @@ String_split(String * self, String * delimiter)
           delimiter->position = 0;
           if(r == null_Array) {
             r = new_Array();
-            r->auto_free = _String_Array_free;
+            r->auto_free = String_Array_free;
           }
 
           self_position = self->position;
@@ -669,7 +697,7 @@ String_split(String * self, String * delimiter)
 
     if(r == null_Array) {
       r = new_Array();
-      r->auto_free = _String_Array_free;
+      r->auto_free = String_Array_free;
     }
 
     self_position = self->position;
@@ -733,15 +761,61 @@ String_upcase(String * self)
 }
 
 
-/*
- * Private Instance Methods
- **************************/
-
-static void
-_String_Array_free(void *data)
+/* Code taken from http://www.daemonology.net/blog/2008-06-05-faster-utf8-strlen.html */
+static size_t
+String_utf8_length(String * self)
 {
-  String *s;
+  char *        s;
+  size_t        count = 0;
+  size_t        u;
+  unsigned char b;
 
-  s = (String *)data;
-  s->m->free(s);
+  if(self != null_String) {
+    /* Handle any initial misaligned bytes. */
+    for (s = self->string; (uintptr_t)(s) & (sizeof(size_t) - 1); s++) {
+      b = *s;
+
+      /* Exit if we hit a zero byte. */
+      if (b == '\0')
+        goto done;
+
+      /* Is this byte NOT the first byte of a character? */
+      count += (b >> 7) & ((~b) >> 6);
+    }
+
+    /* Handle complete blocks. */
+    for (; ; s += sizeof(size_t)) {
+      /* Prefetch 256 bytes ahead. */
+      __builtin_prefetch(&s[256], 0, 0);
+
+      /* Grab 4 or 8 bytes of UTF-8 data. */
+      u = *(size_t *)(s);
+
+      /* Exit the loop if there are any zero bytes. */
+      if ((u - UTF8_ONEMASK) & (~u) & (UTF8_ONEMASK * 0x80))
+        break;
+
+      /* Count bytes which are NOT the first byte of a character. */
+      u = ((u & (UTF8_ONEMASK * 0x80)) >> 7) & ((~u) >> 6);
+      count += (u * UTF8_ONEMASK) >> ((sizeof(size_t) - 1) * 8);
+    }
+
+    /* Take care of any left-over bytes. */
+    for (; ; s++) {
+      b = *s;
+
+      /* Exit if we hit a zero byte. */
+      if (b == '\0')
+        break;
+
+      /* Is this byte NOT the first byte of a character? */
+      count += (b >> 7) & ((~b) >> 6);
+    }
+
+  done:
+    return ((s - self->string) - count);
+  }
+  else {
+    return 0;
+  }
 }
