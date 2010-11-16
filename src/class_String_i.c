@@ -79,12 +79,12 @@ class_String(void)
 
 
 String *
-new_String(char * cstr, size_t size, size_t length)
+new_String(char * cstr, size_t length)
 {
   String * self;
 
-  self = alloc_String(size);
-  self->m->init(self, cstr, size, length);
+  self = alloc_String(length + 1);
+  self->m->init(self, cstr, length + 1, length);
 
   return self;
 }
@@ -376,7 +376,7 @@ String_comparen(String * self, String * other, size_t compare_length)
 static String *
 String_dup(String * self)
 {
-  return new_String(self->string, self->size, self->length);
+  return new_String(self->string, self->length);
 }
 
 
@@ -402,8 +402,9 @@ String_each_line(String *self)
 
   if(self != null_String) {
     if(self->_line == null_String) {
-      self->_line = new_String("", 1024, 0);
+      self->_line = new_String("", 0);
       self->_line->blk_size = 1024;
+      self->_line->m->extend(self->_line, 1023);
     }
 
     if(self->position >= self->length) {
@@ -676,7 +677,7 @@ String_split(String * self, String * delimiter)
 
           self_position = self->position;
           self->position = start_mark;
-          e = new_String(self->string + start_mark, (self_position - start_mark) + 1, self_position - start_mark);
+          e = new_String(self->string + start_mark, self_position - start_mark);
           r->m->append(r, e);
 
           delimiter->position = 0;
@@ -702,7 +703,7 @@ String_split(String * self, String * delimiter)
 
     self_position = self->position;
     self->position = start_mark;
-    e = new_String(self->string + start_mark, (self_position - start_mark) + 1, self_position - start_mark);
+    e = new_String(self->string + start_mark, self_position - start_mark);
     r->m->append(r, e);
   }
 

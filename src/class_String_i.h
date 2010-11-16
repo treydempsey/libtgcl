@@ -33,7 +33,7 @@
 
 /* Class Methods */
 int                   class_String(void);
-String *              new_String(char * cstr, size_t size, size_t length);
+String *              new_String(char * cstr, size_t length);
 String *              alloc_String(size_t size);
 
 /* Instance Methods */

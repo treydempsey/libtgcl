@@ -81,7 +81,7 @@ typedef struct StringMethods {
 
 #ifndef _CLASS_STRING_I_H_
 extern int      class_String(void);
-extern String * new_String(char * cstr, size_t size, size_t length);
+extern String * new_String(char * cstr, size_t length);
 extern String * alloc_String(size_t size);
 
 extern String * null_String;
