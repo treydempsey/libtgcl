@@ -66,6 +66,7 @@ static int            String_to_i(String * self);
 static String *       String_truncate(String * self);
 static String *       String_upcase(String * self);
 static size_t         String_utf8_length(String * self);
+static int            String_utf8_valid(String * self);
 
 
 /* Global Variables */

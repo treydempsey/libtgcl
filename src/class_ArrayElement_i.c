@@ -55,6 +55,10 @@ new_ArrayElement(void * data)
 {
   ArrayElement * self;
 
+  if(null_ArrayElement == NULL) {
+    class_ArrayElement();
+  }
+
   self = alloc_ArrayElement();
   self->m->init(self, data);
 

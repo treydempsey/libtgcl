@@ -31,10 +31,10 @@
 int
 class_Array(void)
 {
-  /* Dependencies */
-  class_ArrayElement();
-
   if(null_Array == NULL) {
+    /* Dependencies */
+    class_ArrayElement();
+
     /* Methods */
     Array_methods.init            = Array_init;
     Array_methods.free            = Array_free;
@@ -70,6 +70,10 @@ Array *
 new_Array(void)
 {
   Array * self;
+
+  if(null_Array == NULL) {
+    class_Array();
+  }
 
   self = alloc_Array();
   self->m->init(self);

@@ -76,6 +76,7 @@ typedef struct StringMethods {
   String *      (*truncate)(String * self);
   String *      (*upcase)(String * self);
   size_t        (*utf8_length)(String * self);
+  int           (*utf8_valid)(String * self);
 } StringMethods;
 
 

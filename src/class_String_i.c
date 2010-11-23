@@ -33,6 +33,7 @@ class_String(void)
 {
   if(null_String == NULL) {
     /* Dependencies */
+    class_ArrayElement();
     class_Array();
 
     /* Methods */
@@ -65,6 +66,7 @@ class_String(void)
     String_methods.truncate     = String_truncate;
     String_methods.upcase       = String_upcase;
     String_methods.utf8_length  = String_utf8_length;
+    String_methods.utf8_valid   = String_utf8_valid;
 
     /* Null String Instance */
     null_String                 = &_null_String;
@@ -82,6 +84,10 @@ String *
 new_String(char * cstr, size_t length)
 {
   String * self;
+
+  if(null_String == NULL) {
+    class_String();
+  }
 
   self = alloc_String(length + 1);
   self->m->init(self, cstr, length + 1, length);
@@ -719,7 +725,7 @@ String_to_i(String * self)
   char ** endval = NULL;
 
   if(self != null_String) {
-    if(self->position > self->length) {
+    if(self->position < self->length) {
       l = strtol(self->string + self->position, endval, 10);
       if(endval == '\0') {
         i = (int)l;
@@ -819,4 +825,82 @@ String_utf8_length(String * self)
   else {
     return 0;
   }
+}
+
+
+static int
+String_utf8_valid(String * self)
+{
+  int   valid = 1;
+  int   continuations = 0;
+  unsigned char  c;
+
+/* Unicode to UTF-8 Mapping
+  [0x00000000 - 0x0000007f] [00000000.0bbbbbbb]                   -> 0bbbbbbb
+  [0x00000080 - 0x000007ff] [00000bbb.bbbbbbbb]                   -> 110bbbbb, 10bbbbbb
+  [0x00000800 - 0x0000ffff] [bbbbbbbb.bbbbbbbb]                   -> 1110bbbb, 10bbbbbb, 10bbbbbb
+  [0x00010000 - 0x001fffff] [00000000.000bbbbb.bbbbbbbb.bbbbbbbb] -> 11110bbb, 10bbbbbb, 10bbbbbb, 10bbbbbb
+  [0x00200000 - 0x03ffffff] [000000bb.bbbbbbbb.bbbbbbbb.bbbbbbbb] -> 111110bb, 10bbbbbb, 10bbbbbb, 10bbbbbb, 10bbbbbb
+  [0x04000000 - 0x7fffffff] [0bbbbbbb.bbbbbbbb.bbbbbbbb.bbbbbbbb] -> 1111110b, 10bbbbbb, 10bbbbbb, 10bbbbbb, 10bbbbbb, 10bbbbbb
+*/
+
+  if(self != null_String) {
+    for(self->position = 0; valid != 0 && self->position < self->length; self->position++) {
+      c = *(self->string + self->position);
+      if(c < 0x20 || c > 0x7e) {
+        //fprintf(stderr, "continuations: %i, 0x%x 0x%x\n", continuations, c, c);
+      }
+      else {
+        //fprintf(stderr, "continuations: %i, %c 0x%x\n", continuations, c, c);
+      }
+      if(continuations == 0) {
+        /* 7-bit ASCII
+           0bbbbbbb & 10000000 == 00000000 */
+        if((c & 0x80) == 0)
+          ;
+        /* 110bbbbb & 11100000 == 11000000 */
+        else if((c & 0xe0) == 0xc0)
+          continuations = 1;
+        /* 1110bbbb & 11110000 == 11100000 */
+        else if((c & 0xf0) == 0xe0)
+          continuations = 2;
+        /* 11110bbb & 11111000 == 11110000 */
+        else if((c & 0xf8) == 0xf0)
+          continuations = 3;
+        /* 111110bb & 11111100 == 11111000 */
+        else if((c & 0xfc) == 0xf8)
+          continuations = 4;
+        /* 1111110b & 11111110 == 11111100 */
+        else if((c & 0xfe) == 0xfc)
+          continuations = 5;
+        /* Invalid byte sequences
+           11111110
+           11111111 */
+        else if(c == 0xfe || c == 0xff)
+          valid = 0;
+      }
+      else {
+        /* Invalid continuation
+           10000000 */
+        if(c == 0x80)
+          valid = 0;
+        /* 10bbbbbb & 11000000 == 10000000 */
+        else if((c & 0xc0) == 0x80)
+          continuations--;
+        /* 7-bit ASCII invalid as a continuation
+           0bbbbbbb & 10000000 == 00000000 */
+        else if((c & 0x80) == 0)
+          valid = 0;
+        /* Invalid byte sequences
+           11111110
+           11111111 */
+        else if(c == 0xfe || c == 0xff)
+          valid = 0;
+      }
+    }
+    self->position = 0;
+  }
+  //fprintf(stderr, "utf8_valid valid: %i\n", valid);
+
+  return valid;
 }
