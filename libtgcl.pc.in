@@ -7,5 +7,5 @@ Name: libtgcl
 Description: libtgcl, Trey's Generic c Class Library, is a collection of useful classes for C.
 URL: http://github.com/tgcl
 Version: @PACKAGE_VERSION@
-Cflags: -fnested-functions -I${includedir}/tgcl
+Cflags: -fnested-functions -I${includedir}
 Libs: -L${libdir} -ltgcl
