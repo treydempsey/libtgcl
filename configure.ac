@@ -1,5 +1,6 @@
-AC_INIT([src/class_Array_i.c])
-AM_INIT_AUTOMAKE([libtgcl],[0.0.1])
+AC_INIT([libtgcl], [0.0.3])
+AC_CONFIG_SRCDIR([src/class_Array_i.c])
+AM_INIT_AUTOMAKE
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
@@ -10,6 +11,7 @@ AC_PROG_INSTALL
 AC_PROG_LIBTOOL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
+PKG_PROG_PKG_CONFIG
 
 AC_HEADER_STDC
 AC_CHECK_HEADERS([ctype.h stdio.h errno.h],,AC_MSG_ERROR([
@@ -26,5 +28,6 @@ required standard library function missing]))
 AC_CONFIG_FILES([
   Makefile
   src/Makefile
+  libtgcl.pc
 ]) 
 AC_OUTPUT

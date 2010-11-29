@@ -1,0 +1,11 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+includedir=${prefix}/include/tgcl
+libdir=${prefix}/lib
+
+Name: libtgcl
+Description: libtgcl, Trey's Generic c Class Library, is a collection of useful classes for C.
+URL: http://github.com/tgcl
+Version: 0.0.3
+Cflags: -fnested-functions -I${includedir}/tgcl
+Libs: -L${libdir} -ltgcl
