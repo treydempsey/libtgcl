@@ -26,8 +26,6 @@
 
 #include <class_ArrayElement.h>
 
-#define ARRAY_CHUNK_SIZE 10
-
 
 /* Class Instance */
 typedef struct Array {
@@ -37,9 +35,8 @@ typedef struct Array {
   struct ArrayElement *   current_element;
   size_t                  size;
   int                     length;
-  int                     current_index;
-  size_t                  chunk_size;
-  size_t                  chunks;
+  int                     position;
+  size_t                  blk_size;
 
   void                    (*auto_free)(void *data);
 
@@ -60,6 +57,7 @@ typedef struct ArrayMethods {
   Array *                 (*difference)(Array * self, Array * other);
   Array *                 (*dup)(Array * self);
   ArrayElement *          (*each)(Array * self);
+  Array *                 (*extend)(Array * self, size_t add);
   ArrayElement *          (*get)(Array * self, size_t index);
   ArrayElement *          (*include)(Array * self, ArrayElement * element);
   Array *                 (*intersection)(Array * self, Array * other);

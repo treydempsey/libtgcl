@@ -24,6 +24,8 @@
 #include "dependencies.h"
 #include "class_Array_i.h"
 
+int Array_allocs = 0;
+
 /*
  * Class Methods
  ***************/
@@ -46,6 +48,7 @@ class_Array(void)
     Array_methods.difference      = Array_difference;
     Array_methods.dup             = Array_dup;
     Array_methods.each            = Array_each;
+    Array_methods.extend          = Array_extend;
     Array_methods.get             = Array_get;
     Array_methods.include         = Array_include;
     Array_methods.intersection    = Array_intersection;
@@ -88,14 +91,17 @@ alloc_Array(void)
   Array ** handle;
 
   /* Allocate */
+  Array_allocs++;
   handle = malloc(sizeof(Array *));
   if(handle == NULL) {
     handle = null_Array->handle;
     goto error;
   }
 
+  Array_allocs++;
   *handle = malloc(sizeof(Array));
   if(*handle == NULL) {
+    Array_allocs--;
     free(handle);
     handle = null_Array->handle;
     goto error;
@@ -118,33 +124,20 @@ static Array *
 Array_init(Array * self)
 {
   /* Variables */
-  self->current_element = null_ArrayElement;
-  self->current_index = 0;
-  self->chunk_size = ARRAY_CHUNK_SIZE;
-  self->size = ARRAY_CHUNK_SIZE;
-  self->chunks = 1;
+  self->blk_size = 64;
   self->length = 0;
+  self->position = 0;
+  self->current_element = null_ArrayElement;
+  self->auto_free = NULL;
 
   if(self != null_Array) {
-    self->elements = malloc(self->size * sizeof(ArrayElement *));
-    if(self->elements == NULL) {
-      free(self->handle);
-      free(self);
-      goto error;
-    }
-    _Array_null_elements(self, 0, self->size - 1);
+    self->size = 1;
+    Array_allocs++;
+    self->elements = malloc(self->blk_size * sizeof(ArrayElement *));
   }
   else {
-    self->size = 1;
-    self->chunk_size = 1;
+    self->size = 0;
     self->elements = null_ArrayElement->handle;
-  }
-
-
-error:
-
-  if(errno == ENOMEM) {
-    perror("Array_init()");
   }
 
   return self;
@@ -164,11 +157,14 @@ Array_free(Array * self)
       }
     }
 
-    for(i = 0; i < self->length; i++) {
+    for(i = 0; i < self->size; i++) {
       self->elements[i]->m->free(self->elements[i]);
     }
+    Array_allocs--;
     free(self->elements);
+    Array_allocs--;
     free(self->handle);
+    Array_allocs--;
     free(self);
   }
 
@@ -187,7 +183,7 @@ Array_append(Array * self, void * data)
 
   if(self != null_Array) {
     if((self->length + 1) >= self->size) {
-      _Array_extend_elements(self, 1);
+      self->m->extend(self, 1);
     }
 
     new_element = new_ArrayElement(data);
@@ -205,7 +201,7 @@ Array_append_element(Array * self, ArrayElement * element)
 {
   if(self != null_Array) {
     if((self->length + 1) >= self->size) {
-      _Array_extend_elements(self, 1);
+      self->m->extend(self, 1);
     }
 
     self->elements[self->length] = element;
@@ -227,21 +223,14 @@ Array_compare(Array * self, Array * other)
 static Array *
 Array_concat(Array * self, Array * other)
 {
-  Array * new_array;
-
   if(self != null_Array) {
-    new_array = self->m->dup(self);
-
     other->m->reset_each(other);
     while(other->m->each(other) != null_ArrayElement) {
-      new_array->m->append(new_array, other->current_element->m->dup(other->current_element));
+      self->m->append_element(self, other->current_element->m->dup(other->current_element));
     }
+  }
 
-    return new_array;
-  }
-  else {
-    return null_Array;
-  }
+  return self;
 }
 
 
@@ -275,9 +264,11 @@ Array_dup(Array * self)
 
   new_array = new_Array();
   if(self != null_Array) {
+    new_array->blk_size = self->blk_size;
+    new_array->auto_free = self->auto_free;
     self->m->reset_each(self);
     while(self->m->each(self) != null_ArrayElement) {
-      new_array->m->append(new_array, self->current_element->m->dup(self->current_element));
+      new_array->m->append_element(new_array, self->current_element->m->dup(self->current_element));
     }
 
     return new_array;
@@ -291,14 +282,15 @@ Array_dup(Array * self)
 static ArrayElement *
 Array_each(Array * self)
 {
-  if(self != null_Array) {
-    if(self->current_index >= self->length) {
-      self->current_index = -1;
+  if(self != null_Array
+     && self->length > 0) {
+    if(self->position >= self->length) {
+      self->position = -1;
       self->current_element = null_ArrayElement;
     }
     else {
-      self->current_index++;
-      self->current_element = self->elements[self->current_index];
+      self->position++;
+      self->current_element = self->elements[self->position];
     }
 
     return self->current_element;
@@ -306,7 +298,47 @@ Array_each(Array * self)
   else {
     return null_ArrayElement;
   }
+}
 
+
+static Array *
+Array_extend(Array * self, size_t add)
+{
+  size_t          new_size;
+  ArrayElement ** extended;
+  int             i;
+
+  if(add < 1) {
+    return self;
+  }
+
+  if(self != null_Array) {
+    if(self->blk_size == 0) {
+      new_size = self->size + add;
+    }
+    else {
+      new_size = (self->size + add) / self->blk_size;
+      new_size = (((self->size + add) % self->blk_size) == 0) ? new_size : new_size + 1;
+      new_size = new_size * self->blk_size;
+    }
+
+    extended = realloc(self->elements, new_size * sizeof(ArrayElement *));
+    if(extended == NULL) {
+      perror("Array_extend()\n");
+    }
+    else {
+      self->elements = extended;
+
+      /* Initialize the new elements to null_ArrayElement */
+      for(i = self->size; i < new_size; i++) {
+        self->elements[i] = null_ArrayElement;
+      }
+
+      self->size = new_size;
+    }
+  }
+
+  return self;
 }
 
 
@@ -400,7 +432,7 @@ Array_reset_each(Array * self)
 {
   if(self != null_Array) {
     self->current_element = null_ArrayElement;
-    self->current_index = -1;
+    self->position = -1;
   }
 
   return self;
@@ -438,81 +470,18 @@ Array_repetition(Array * self, int times)
 static Array *
 Array_set(Array * self, size_t index, ArrayElement * element)
 {
-  int chunks;
+  if(self != null_Array
+     && index >= 0
+     && index < self->length) {
 
-  if(self != null_Array) {
-    if(index >= self->size) {
-      chunks = ((index + 1) / self->chunk_size);
-      if(((index + 1) % self->chunk_size) > 0) {
-        chunks++;
-      }
-
-      _Array_extend_elements(self, chunks - self->chunks);
+    if(self->auto_free != NULL
+       && self->elements[index] != null_ArrayElement) {
+      self->auto_free(self->elements[index]->data);
+      self->elements[index]->data = NULL;
     }
+    self->elements[index]->m->free(self->elements[index]);
 
-    if((index - 1) > (self->length - 1)) {
-      _Array_null_elements(self, (self->length - 1), (index - 1));
-    }
-
-    *(self->elements + index) = element;
-  }
-
-  return self;
-}
-
-
-/* 
- * Private Methods
- *****************/
-
-static Array *
-_Array_extend_elements(Array * self, int add_elements)
-{
-  size_t          new_size;
-  size_t          new_chunks;
-  ArrayElement ** extended;
-
-  if(self != null_Array) {
-    new_size = self->size + add_elements;
-    new_chunks = new_size / self->chunk_size;
-    new_chunks += (new_size % self->chunk_size == 0) ? 0 : 1;
-
-    if(new_chunks > self->chunks) {
-      extended = realloc(self->elements, (new_chunks * self->chunk_size) * sizeof(ArrayElement *));
-      if(extended == NULL) {
-        goto error;
-      }
-      else {
-        self->chunks = new_chunks;
-        self->size = new_chunks * self->chunk_size;
-        self->elements = extended;
-      }
-      _Array_null_elements(self, self->length, self->size - 1);
-    }
-
-  error:
-
-    if(errno == ENOMEM) {
-      perror("_Array_extend_elements()");
-    }
-  }
-
-  return self;
-}
-
-
-static Array *
-_Array_null_elements(Array * self, size_t start, size_t end)
-{
-  int i, j;
-
-  if(self != null_Array) {
-    j = self->size;
-    j = (end < j) ? end : j - 1;
-
-    for(i = start; i <= j; i++) {
-      *(self->elements + i) = null_ArrayElement;
-    }
+    self->elements[index] = element;
   }
 
   return self;

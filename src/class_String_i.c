@@ -499,7 +499,7 @@ String_extend(String * self, size_t add)
     }
 
     extended = realloc(self->string, new_size);
-    if(self->string == NULL) {
+    if(extended == NULL) {
       perror("String_extend()\n");
     }
     else {
@@ -569,7 +569,7 @@ String_join(String * self, Array * array, String * separator)
   join_block(Array * array, ArrayElement * element, void * target)
   {
     ((String *)target)->m->append((String *)target, (String *)element->data);
-    if(separator != null_String && array->current_index < (array->length - 1)) {
+    if(separator != null_String && array->position < (array->length - 1)) {
       self->m->append(self, separator);
     }
     return target;
