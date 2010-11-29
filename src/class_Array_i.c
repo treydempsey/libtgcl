@@ -24,8 +24,6 @@
 #include "dependencies.h"
 #include "class_Array_i.h"
 
-int Array_allocs = 0;
-
 /*
  * Class Methods
  ***************/
@@ -91,17 +89,14 @@ alloc_Array(void)
   Array ** handle;
 
   /* Allocate */
-  Array_allocs++;
   handle = malloc(sizeof(Array *));
   if(handle == NULL) {
     handle = null_Array->handle;
     goto error;
   }
 
-  Array_allocs++;
   *handle = malloc(sizeof(Array));
   if(*handle == NULL) {
-    Array_allocs--;
     free(handle);
     handle = null_Array->handle;
     goto error;
@@ -131,13 +126,26 @@ Array_init(Array * self)
   self->auto_free = NULL;
 
   if(self != null_Array) {
-    self->size = 1;
-    Array_allocs++;
+    self->size = self->blk_size;
     self->elements = malloc(self->blk_size * sizeof(ArrayElement *));
+    if(self->elements == NULL) {
+      self->elements = null_ArrayElement->handle;
+      goto error;
+    }
+
+    for(self->position = 0; self->position < self->size; self->position++) {
+      self->elements[self->position] = null_ArrayElement;
+    }
   }
   else {
     self->size = 0;
     self->elements = null_ArrayElement->handle;
+  }
+
+error:
+
+  if(errno == ENOMEM) {
+    perror("Array_init()");
   }
 
   return self;
@@ -160,11 +168,8 @@ Array_free(Array * self)
     for(i = 0; i < self->size; i++) {
       self->elements[i]->m->free(self->elements[i]);
     }
-    Array_allocs--;
     free(self->elements);
-    Array_allocs--;
     free(self->handle);
-    Array_allocs--;
     free(self);
   }
 
